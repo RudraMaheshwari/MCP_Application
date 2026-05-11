@@ -1,0 +1,9 @@
+fastmcp>=3.2.4
+langchain>=0.3
+langchain-openai>=0.2
+langchain-core>=0.3
+langgraph>=0.5
+openai>=2.0
+matplotlib>=3.9
+numpy>=1.26
+python-dotenv>=1.0
