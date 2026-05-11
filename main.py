@@ -1,16 +1,15 @@
 from fastmcp import FastMCP
+from mcp.types import ImageContent
 import json
-import os
-from src.config.settings import OUTPUTS_DIR
 from src.agents.chart_agent import run_chart_agent
 
 mcp = FastMCP(name="Chart Generation MCP Server")
 
 
 @mcp.tool
-def generate_chart(description: str) -> str:
+def generate_chart(description: str) -> list[ImageContent]:
     """
-    Generate a matplotlib chart from a natural language description and return the saved file path.
+    Generate a matplotlib chart from a natural language description and return it as an image.
 
     Pass your data and chart type in plain English. Examples:
       - "Bar chart of monthly sales: Jan=5000, Feb=7200, Mar=6100"
@@ -20,9 +19,14 @@ def generate_chart(description: str) -> str:
       - "Scatter plot of height vs weight: [(160,55),(170,65),(180,80)]"
 
     Supported chart types: bar, histogram, pie, line, scatter, box, heatmap.
+    Returns the chart as an inline image.
     """
-    os.makedirs(OUTPUTS_DIR, exist_ok=True)
-    return run_chart_agent(description)
+    b64 = run_chart_agent(description)
+
+    if b64.startswith("ERROR"):
+        raise ValueError(b64)
+
+    return [ImageContent(type="image", data=b64, mimeType="image/png")]
 
 
 @mcp.resource("info://server")
@@ -32,11 +36,10 @@ def server_info() -> str:
         "name": "chart-generation-mcp-server",
         "description": (
             "MCP server that uses a LangChain agent to generate matplotlib charts "
-            "from natural language descriptions."
+            "from natural language descriptions and returns them as inline images."
         ),
         "tools": ["generate_chart"],
         "supported_charts": ["bar", "histogram", "pie", "line", "scatter", "box", "heatmap"],
-        "outputs_dir": OUTPUTS_DIR,
     }
     return json.dumps(info, indent=2)
 
