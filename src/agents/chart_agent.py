@@ -1,22 +1,30 @@
-from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, ToolMessage
+import re
+
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from src.model.llm import get_llm
 from src.prompts.chart_prompt import CHART_SYSTEM_PROMPT
-from src.tools.chart_tools import execute_chart_code
-
-
-def build_agent():
-    return create_agent(get_llm(), [execute_chart_code], system_prompt=CHART_SYSTEM_PROMPT)
+from src.utils.code_executor import run_code
 
 
 def run_chart_agent(user_input: str) -> str:
-    agent = build_agent()
-    result = agent.invoke({"messages": [HumanMessage(content=user_input)]})
+    """Two-step: LLM writes code, executor runs it.
 
-    # Extract base64 directly from the tool result — the final AI message
-    # often wraps it in explanatory text which breaks ImageContent.
-    for msg in reversed(result["messages"]):
-        if isinstance(msg, ToolMessage):
-            return msg.content
+    Avoids the agent loop feeding the 300KB base64 result back to the LLM,
+    which would exceed the context window.
+    """
+    llm = get_llm()
 
-    return result["messages"][-1].content
+    response = llm.invoke([
+        SystemMessage(content=CHART_SYSTEM_PROMPT),
+        HumanMessage(content=user_input),
+    ])
+
+    code = str(response.content).strip()
+
+    # Strip markdown fences if present
+    match = re.search(r"```(?:python)?\n?(.*?)```", code, re.DOTALL)
+    if match:
+        code = match.group(1).strip()
+
+    return run_code(code)
